@@ -11,17 +11,16 @@ public class Snake {
     public Double current_x, current_y, diameter, stepsize, lastangle,locx, locy;
     private Color paint1, paint2;
     private Boolean gradient, boosting;
-    private int snakeid;
+    public int snakeid;
     public int size;
+    public String name;
 
-    public Snake(Integer id, Double x, Double y, Color p1, Color p2, Integer size){
+    public Snake(Integer id, Double x, Double y, Color p1, Color p2, Integer size, ArrayList<Double> cords, String name){
         this.size = size;
-        cord = new ArrayList<>();
+        this.name = name;
+        cord = cords;
         snakeid = id;
         stepsize = 5.0;
-        for(int i = 0; i < size; i++){
-            cord.add(0.0);
-        }
         lastangle = 0.0;
         paint1 = p1;
         paint2 = p2;
@@ -31,12 +30,13 @@ public class Snake {
         locy = y;
         gradient = false;
         boosting = false;
-
     }
 
     public void draw_snake(Graphics2D g2d, Double map_x, Double map_y){
         current_x = locx - map_x - diameter/2;
         current_y = locy - map_y - diameter/2;
+        g2d.setPaint(Color.ORANGE);
+        g2d.drawString(name, (int)(current_x/1), (int)(current_y/1));
         g2d.setPaint(paint1);
         g2d.fill(new Ellipse2D.Double(current_x, current_y, diameter, diameter));
         if (gradient)
@@ -64,12 +64,19 @@ public class Snake {
         //g2d.fill(new Ellipse2D.Double(head_x, head_y, diameter, diameter));
     }
 
-    public void update(Double angle, LinkedHashMap<Integer, Integer> bodys, Map map){
+    public void update(Double angle, double x, double y){
         cord.remove(0);
         lastangle = angle;
         cord.add(lastangle);
-        locx -= stepsize * Math.sin(angle);
-        locy -= stepsize * Math.cos(angle);
+        locx = x;
+        locy = y;
+        if (boosting&&(size >30)){
+            cord.remove(0);
+            lastangle = angle;
+            cord.add(lastangle);
+            locx -= stepsize * Math.sin(angle);
+            locy -= stepsize * Math.cos(angle);
+        }
     }
 
     public void set_color(Color c1, Color c2){
@@ -86,10 +93,6 @@ public class Snake {
         boosting = bool;
     }
 
-    public void set_loc(Double x, Double y) {
-        locx = x;
-        locy = y;
-    }
 
     public void bigger(int size){
         this.size += size;

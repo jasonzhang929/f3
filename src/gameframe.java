@@ -19,14 +19,10 @@ public class gameframe extends JPanel implements MouseListener,
     static Boolean running = false;
     public static Boolean boosting;
     public static Map map;
-    public static GameClient client;
-
-
-
+    public static GameClient client = null;
+    private String usern = "";
 
     public gameframe() throws IOException {
-        //initialize
-
         mouseloc = new JLabel("(0,0)");
         P1 = null;
         color1 = color2 = Color.BLUE;
@@ -34,12 +30,9 @@ public class gameframe extends JPanel implements MouseListener,
         addMouseMotionListener(this);
         center_x = this.getWidth()/2.0;
         center_y = this.getHeight()/2.0;
-        map = new Map(3000, 3000);
+        map = new Map(3000, 3000, mouseloc);
         angle = 1.0;
         boosting = false;
-
-
-
     }
 
     @Override
@@ -50,13 +43,21 @@ public class gameframe extends JPanel implements MouseListener,
     @Override
     public void mousePressed(MouseEvent e) {
         boosting = true;
-        map.mysnake.set_boosting(true);
+        try {
+            map.setmysnake_boost(true, client);
+        } catch (IOException e1) {
+            e1.printStackTrace();
+        }
     }
 
     @Override
     public void mouseReleased(MouseEvent e) {
         boosting = false;
-        map.mysnake.set_boosting(false);
+        try {
+            map.setmysnake_boost(true, client);
+        } catch (IOException e1) {
+            e1.printStackTrace();
+        }
     }
 
     @Override
@@ -72,7 +73,7 @@ public class gameframe extends JPanel implements MouseListener,
     @Override
     public void mouseDragged(MouseEvent e) {
         P1 = e.getPoint();
-        angle = Math.atan((P1.x - center_x)/(P1.y - center_y+0.01));
+        angle = Math.atan((P1.x - center_x)/(P1.y - center_y));
         if ((P1.y - center_y) >= 0)
             angle += 3.1415;
 
@@ -82,7 +83,7 @@ public class gameframe extends JPanel implements MouseListener,
     @Override
     public void mouseMoved(MouseEvent e) {
         P1 = e.getPoint();
-        angle = Math.atan((P1.x - center_x)/(P1.y - center_y+ 0.01));
+        angle = Math.atan((P1.x - center_x)/(P1.y - center_y));
         if ((P1.y - center_y) >= 0)
             angle += 3.1415;
          //To change body of generated methods, choose Tools | Templates.
@@ -91,9 +92,6 @@ public class gameframe extends JPanel implements MouseListener,
     @Override
     public void paint(Graphics g) {
         super.paint(g);
-        int number;
-        Color paint1, paint2;
-        String[] items;
         Graphics2D g2d = (Graphics2D) g;
         map.paint_background(g2d);
     }
@@ -128,6 +126,7 @@ public class gameframe extends JPanel implements MouseListener,
                 if (!running) {
                     running = true;
                     try {
+                        map.reset();
                         start_game(drwp);
                     } catch (IOException e1) {
                         e1.printStackTrace();
@@ -135,11 +134,22 @@ public class gameframe extends JPanel implements MouseListener,
                 }
             }
         });
-        JButton clear = new JButton("Pause");
+        JTextField ipaddress = new JTextField();
+        ipaddress.setColumns(10);
+        JTextField username = new JTextField();
+        username.setColumns(10);
+
+        JButton clear = new JButton("Connect");
         clear.addActionListener(new ActionListener() {
             @Override
-            public void actionPerformed(ActionEvent e) {
-                running = false;
+            public void actionPerformed(ActionEvent e)
+            {
+                try {
+                    client = new GameClient(ipaddress.getText());
+                    drwp.usern = username.getText();
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                }
             }
         });
         JButton firstcolor = new JButton("1st color");
@@ -164,7 +174,6 @@ public class gameframe extends JPanel implements MouseListener,
 
         JCheckBox gradient = new JCheckBox();
         gradient.addItemListener(new ItemListener() {
-            @Override
             public void itemStateChanged(ItemEvent e) {
                 map.mysnake.set_gradient();
 
@@ -178,8 +187,10 @@ public class gameframe extends JPanel implements MouseListener,
         dframe.setLayout(experimentLayout);
         Box box = Box.createHorizontalBox();
         box.add(undo);
-        box.add(clear);
+        box.add(username);
+        box.add(ipaddress);
 
+        box.add(clear);
         dframe.add(box);
         box = Box.createHorizontalBox();
         box.add(gradient);
@@ -195,24 +206,27 @@ public class gameframe extends JPanel implements MouseListener,
 
     }
 
-    private static void start_game(gameframe game) throws IOException{
-        client = new GameClient();
-        String result = "";
-        while (!result.equals("set")){
-            result = client.receive_data();
-            map.excute(result);
-        }
-        client.send_data("finished");
-        result = client.receive_data();
-        client.close_client();
+    private static void start_game(gameframe game) throws IOException {
+        client.send_data("start " + game.usern);
+        final String[] result = {""};
         new Thread(() -> {
             long startTime;
             while (running) {
                 startTime = System.currentTimeMillis();
-                running = map.update(angle, mouseloc);
-                if (!running) {
-                    map.set_loc(0.0, 0.0);
+                try{
 
+                    result[0] = client.receive_data();
+                    while (!result[0].equals("done")){
+                        running = map.excute(result[0]);
+                        result[0] = client.receive_data();
+                    }
+                    if (running)
+                        client.send_data("update " + Integer.toString(map.mysnakeid) + " " + Double.toString(angle)
+                    + " " + Boolean.toString(boosting));
+
+                }
+                catch (IOException e1) {
+                    e1.printStackTrace();
                 }
                 game.repaint();
                 try {
@@ -221,12 +235,6 @@ public class gameframe extends JPanel implements MouseListener,
                     ex.printStackTrace();
                 }
             }
-            try {
-                client.close_client();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }).start();
     }
-
 }
